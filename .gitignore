@@ -1,0 +1,9 @@
+# Jupyter の自動保存
+.ipynb_checkpoints/
+
+# Python のバイトコード
+__pycache__/
+
+# 再計算で作れる大きなバイナリ。cube と log はリポジトリに残す
+**/*.chk
+**/*.molden
