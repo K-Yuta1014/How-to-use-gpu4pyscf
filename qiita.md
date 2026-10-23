@@ -63,6 +63,7 @@ GitHubにある`dft_sandbox.ipynb`を使って計算していきます。この�
 ```python
 # 標準ライブラリ
 import os      # 入出力ファイルのパス操作とディレクトリ作成
+import sys     # PySCFのログがノートブック出力そのものかを判定する
 import re      # 材料名をファイル名に使える文字へ置換
 import time    # 分子ごとの計算時間を計測
 import gc      # 計算オブジェクトを破棄し、GPUメモリを返せるようにする
@@ -90,7 +91,7 @@ import pyscf       # 量子化学計算の本体
 import gpu4pyscf   # PySCFのGPU版。DFTとTD-DFTをGPUで実行する
 import geometric   # 構造最適化エンジン geomeTRIC
 from pyscf import gto  # 座標・基底関数・電荷から計算用の分子を定義
-from pyscf.geomopt.geometric_solver import optimize  # geomeTRICによる構造最適化
+from pyscf.geomopt.geometric_solver import kernel as geom_kernel  # geomeTRIC。収束フラグも受け取る
 from pyscf.tools import cubegen  # HOMO/LUMOをcubeファイルとして書き出す
 from gpu4pyscf.dft import rks as dft_rks    # GPU上のDFT（基底状態のエネルギーと軌道）
 from gpu4pyscf.tdscf import rks as td_rks  # GPU上のTD-DFT（励起状態 S1/T1）
@@ -107,6 +108,21 @@ def release_gpu():
     gc.collect()
     cupy.get_default_memory_pool().free_all_blocks()
     cupy.get_default_pinned_memory_pool().free_all_blocks()
+
+def close_pyscf_log(obj):
+    # PySCFはログを開きっぱなしにする。次の計算で同じパスを使うと 'w' で中身が消える
+    stdout = getattr(obj, "stdout", None)
+    if stdout is None or stdout in (sys.stdout, sys.stderr):
+        return
+    try:
+        stdout.flush()
+    except Exception:
+        pass
+    try:
+        if not stdout.closed:
+            stdout.close()
+    except Exception:
+        pass
 ```
 
 使用したライブラリのversionは以下の通りです。
@@ -162,14 +178,16 @@ def smiles_to_3d_block(smiles):
             return None, None
             
     # 力場 (MMFF94) を用いた高速構造最適化を行い、妥当な初期構造を取得
+    # MMFFが組めないときは例外ではなく -1 が返る。そのときだけUFFへ替える
     try:
-        AllChem.MMFFOptimizeMolecule(mol)
-    except:
-        # MMFFが失敗した場合はUFFで代替
+        mmff_failed = AllChem.MMFFOptimizeMolecule(mol) == -1
+    except Exception:
+        mmff_failed = True
+    if mmff_failed:
         try:
             AllChem.UFFOptimizeMolecule(mol)
-        except:
-            pass # 最適化されていない3D座標のまま処理を継続
+        except Exception:
+            pass  # 最適化されていない3D座標のまま処理を継続
             
     # 3D座標の抽出
     conf = mol.GetConformer()
@@ -201,13 +219,26 @@ def run_dft_optimization(coord_string, charge=0, xc='b3lyp', basis='6-31g', mol_
     3. 最適化構造でSCFをやり直す（ここが電子状態の本番計算）
     4. HOMO/LUMO、Mulliken電荷、Molden、Cube、基底状態の双極子、TD-DFTを出す
     """
-    # PySCFのSCF反復などの詳細ログを書き出すファイル
+    # 単点計算・TD-DFTのログ。構造最適化のログとは別ファイルにする
+    # PySCFは output にパスを渡すと、そのファイルを 'w' で開き直して中身を消す
     log_file = os.path.join(out_dir, f"{mol_name}.log")
+    geom_log = os.path.join(out_dir, f"{mol_name}_geomopt.log")
+    xyz_path = os.path.join(out_dir, f"{mol_name}_opt.xyz")
+    skip_opt = os.path.exists(xyz_path)
 
     print("  -> 構造最適化 (DFT) を実行中...")
     # RDKit由来の座標文字列からPySCFの分子を作る。この行ではまだエネルギーは計算しない
-    # verbose=4 は反復ログを詳しく残す指定、output はそのログの保存先
-    mol = gto.M(atom=coord_string, basis=basis, charge=charge, verbose=4, output=log_file)
+    # verbose=4 は反復ログを詳しく残す指定。既存のxyzを読むときは、ここではログを出さない
+    if skip_opt:
+        mol = gto.M(atom=coord_string, basis=basis, charge=charge, verbose=0)
+    else:
+        mol = gto.M(atom=coord_string, basis=basis, charge=charge, verbose=4, output=geom_log)
+    if mol.nelectron % 2 != 0:
+        close_pyscf_log(mol)
+        raise ValueError(
+            f"電子数が奇数 ({mol.nelectron}) です。このノートブックは閉殻のRKS専用です。"
+            "イオンやラジカルは dft_ip_reorg.ipynb / dft_ea_reorg.ipynb を使ってください。"
+        )
     # exact_exchange=False: JもKもRI近似。True: JだけRI近似し、交換Kは4中心積分で厳密に計算する
     def build_rks(target_mol):
         rks = dft_rks.RKS(target_mol, xc=xc)
@@ -219,37 +250,36 @@ def run_dft_optimization(coord_string, charge=0, xc='b3lyp', basis='6-31g', mol_
         print("  -> 2電子積分: Coulomb(J)はRI近似、交換(K)は厳密計算")
     else:
         print("  -> 2電子積分: Coulomb(J)と交換(K)の両方をRI近似")
-    mf = build_rks(mol)
-    # 交換相関項の数値積分グリッド。3はPySCFの初期値で、GaussianのIntegral=Fineに近い
-    # 比較表の数値は、これより粗い level=1 で計算している
-    mf.grids.level = 3
 
-    # 最適化構造の保存先。このファイルが既にあれば、構造最適化は飛ばして座標だけ再利用する
-    xyz_path = os.path.join(out_dir, f"{mol_name}_opt.xyz")
-    if os.path.exists(xyz_path):
+    if skip_opt:
         print("  -> 既存の最適化構造が見つかりました。構造最適化をスキップします。")
-        # xyz全文は、あとで関数の戻り値として返す
         with open(xyz_path, "r") as f_xyz:
             lines = f_xyz.readlines()
         opt_xyz_str = "".join(lines)
 
-        # xyzの1行目は原子数、2行目はコメント。3行目以降の「元素 x y z」をPySCFの入力形式に戻す
         coord_list = []
         for line in lines[2:]:
             parts = line.strip().split()
             if len(parts) >= 4:
                 coord_list.append(f"{parts[0]} {parts[1]} {parts[2]} {parts[3]}")
-        # 例: "C 0.0 0.0 0.0; N 1.2 0.0 0.0"
         opt_coord_string = "; ".join(coord_list)
+        if not opt_coord_string:
+            raise ValueError(f"最適化構造のxyzを読めませんでした: {xyz_path}")
+        close_pyscf_log(mol)
     else:
-        # geomeTRICが、DFTのエネルギーと原子核にかかる力を使って構造を動かす。上限は100ステップ
-        mol_opt = optimize(mf, maxsteps=100)
+        mf = build_rks(mol)
+        # 交換相関項の数値積分グリッド。3はPySCFの初期値で、GaussianのIntegral=Fineに近い
+        # 比較表の数値は、これより粗い level=1 で計算している
+        mf.grids.level = 3
+        # optimize() は収束フラグを捨てる。未収束を成功にしないため kernel を使う
+        conv, mol_opt = geom_kernel(mf, maxsteps=100)
+        if not conv:
+            close_pyscf_log(mol)
+            raise RuntimeError("構造最適化が100ステップ以内に収束しませんでした。")
 
-        # 最適化後の座標（Bohr）と元素記号を取り出す
         opt_coords = mol_opt.atom_coords()
         opt_symbols = [mol_opt.atom_symbol(i) for i in range(mol_opt.natm)]
 
-        # 標準xyzの先頭2行は、原子数とタイトル
         xyz_lines = [f"{mol_opt.natm}", f"{mol_name} optimized by DFT"]
         coord_list = []
         for sym, pos in zip(opt_symbols, opt_coords):
@@ -258,17 +288,15 @@ def run_dft_optimization(coord_string, charge=0, xc='b3lyp', basis='6-31g', mol_
             coord_list.append(f"{sym} {pos_ang[0]} {pos_ang[1]} {pos_ang[2]}")
             xyz_lines.append(f"{sym} {pos_ang[0]:.5f} {pos_ang[1]:.5f} {pos_ang[2]:.5f}")
 
-        opt_coord_string = "; ".join(coord_list)  # この後の電子状態計算へ渡す座標
+        opt_coord_string = "; ".join(coord_list)
         opt_xyz_str = "\n".join(xyz_lines) + "\n"
 
         with open(xyz_path, "w") as f_xyz:
             f_xyz.write(opt_xyz_str)
-        # 構造を動かしていたオブジェクトは、単点計算では使わない
         del mol_opt
-
-    # 最適化用のDFTオブジェクトが握っているVRAMを、次の単点計算へ返す
-    del mf
-    release_gpu()
+        close_pyscf_log(mol)
+        del mf
+        release_gpu()
 
     # 最適化そのものではなく、最適化後の座標で分子を作り直してSCFを収束させる
     # 既存xyzを読んだ場合は、ここで初めて電子状態計算を行う
@@ -337,6 +365,7 @@ def run_dft_optimization(coord_string, charge=0, xc='b3lyp', basis='6-31g', mol_
 
     delta_est_ev = s1_ev - t1_ev  # 一重項と三重項の差 ΔEst
     e_tot = float(mf_opt.e_tot)  # 全エネルギーは数だけ残し、GPU上の計算オブジェクトは捨てる
+    close_pyscf_log(mol)
     del mf_opt, td_t, mol
     release_gpu()
     # 戻り値: HOMO, LUMO, S1, T1, ΔEst, 振動子強度, 双極子の大きさ, 全エネルギー(Hartree), 最適化xyz
@@ -344,9 +373,9 @@ def run_dft_optimization(coord_string, charge=0, xc='b3lyp', basis='6-31g', mol_
 ```
 
 詳細はコメントで書いている通りです。ざっと、流れを説明すると、
-1. ログファイルの出力先を決める
+1. ログファイルの出力先を決める。構造最適化は `_geomopt.log`、単点計算は `.log` で、同じファイルにすると最適化ログが消える
 2. 初期座標でDFTの計算条件を作る、この時点ではまだエネルギー計算はしない
-3. 最適化済みのxyzがあれば座標を読み、なければ`optimize`で構造最適化
+3. 最適化済みのxyzがあれば座標を読み、なければ `geom_kernel` で構造最適化する。100ステップで未収束なら失敗にする
 4. 最適化後の座標で分子を作り直し、SCFで電子状態を計算
 5. HOMOとLUMOを取り出す
 6. Mulliken電荷を計算

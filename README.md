@@ -8,23 +8,27 @@ English version: [README_EN.md](README_EN.md)
 量子化学計算ができるpythonのライブラリを以前使ってみたのですが、なかなか計算が終わらず困っていました。そこでGPUを使って計算を高速化できないか検討した結果となります。今回使用する、`gpu4pyscf`を使うと分子量がある程度大きい分子でも（もちろん限界はありますが）、問題なくDFT計算が実行できたのでその手順をまとめておきます。
 
 ## 実行環境の構築 (Environment Setup)
-本コードは `conda`（または `mamba` / `micromamba`）を使用して、依存関係の競合なく簡単に実行環境を再現することができます。
+本コードは `conda`（または `mamba` / `micromamba`）を使用して、依存関係の競合なく簡単に実行環境を再現することができます。NVIDIA のドライバ（CUDA 12 が使えるもの）は別途必要です。
 
 ```bash
-# 1. リポジトリをクローンしたディレクトリに移動
-cd /path/to/<your_repository_name>
+# 1. リポジトリをクローンして、そのディレクトリへ移動する
+git clone https://github.com/K-Yuta1014/How-to-use-gpu4pyscf.git
+cd How-to-use-gpu4pyscf
 
-# 2. environment.yml を用いてconda環境を作成
+# 2. environment.yml を用いて conda 環境を作成
 conda env create -f environment.yml
 
 # 3. 環境を有効化
 conda activate gpu4pyscf
+
+# 4. リポジトリのルートで Jupyter を起動する
+jupyter lab
 ```
 
-これだけで、PySCF, GPU4PySCF, MACE, cuTENSOR等の必要なライブラリが全てインストールされた状態になり、すぐにJupyter Notebookを立ち上げて実行可能です。
+これだけで、PySCF, GPU4PySCF, MACE, cuTENSOR等の必要なライブラリが全てインストールされます。ノートブック内の `data/` や `output/` は、クローンしたディレクトリからの相対パスです。`jupyter lab` はそのディレクトリで起動してください。
 
 ## 入力データの形式 (Input Data Format)
-計算を開始するためには、あらかじめ `data/` ディレクトリ内にバッチ処理したい化合物のリストをまとめたCSVファイルを配置する必要があります。CSVファイルは以下の2つの列を最低限含んでいる必要があります。
+計算を開始するためには、あらかじめ `data/` ディレクトリ内にバッチ処理したい化合物のリストをまとめたCSVファイルを配置する必要があります。CSVファイルは以下の2つの列を最低限含んでいる必要があります。列の順番はどちらが先でも構いません。
 
 - **`material` (または `index`)**: 化合物を識別するためのIDや名前（例: `BTD1`, `1`, `OLED_Material_A` など）。この文字列がそのまま出力先のフォルダ名やログファイル名に利用されます。
 - **`SMILES`**: 計算対象の分子構造を表すSMILES文字列（例: `C=1C=CC=CC1`）。
@@ -147,7 +151,7 @@ HOMO は 0.05 eV 以内に収まっていますが、LUMO、S1、f はかなり�
   計算の入力となるSMILESリストが含まれたCSVファイルを配置します。
 - **`output/`**
   **結果の保存先ディレクトリです（通常版DFTおよび単分子解析）。**
-  分子ごとの詳細データ（`.log`, `.xyz`, `.cube`, `.molden`, `result.txt`）や最終的な物性値が一覧になった結果CSVがここに保存されます。
+  分子ごとの詳細データ（`.log`, `_geomopt.log`, `.xyz`, `.cube`, `.molden`, `result.txt`）や最終的な物性値が一覧になった結果CSVがここに保存されます。`.log` は最適化構造での単点計算、`_geomopt.log` は構造最適化のログです。
 - **`output_mace/`**
   **結果の保存先ディレクトリです（MACE版）。**
   `mace_tddft_sandbox.ipynb` を実行した際に生成される詳細データと、結果一覧のCSVファイルが保存されます。
