@@ -48,7 +48,7 @@ GPU4PySCF optimizes each geometry and then runs the excited-state calculation.
 
 - **Purpose**: screen HOMO, LUMO, S1, T1, and the oscillator strength *f* for many molecules.
 - **How to run**: point the notebook at a CSV in `data/` and run the cells.
-- **Output**: under `output/`, an optimized geometry (`_opt.xyz`), a Molden file, cube files, and a CSV of properties.
+- **Output**: under `output/`, an optimized geometry (`_opt.xyz`), a Molden file, an `.fchk`, HOMO/LUMO cube files, and a CSV of properties.
 
 #### Example
 
@@ -87,16 +87,16 @@ BASIS_SET = '6-31g*'
 
 GPU4PySCF accepts the same functional and basis names as PySCF, including polarization and diffuse functions.
 
-Running the batch cell writes the properties to the output CSV. The table below compares this B3LYP/6-31G(d) calculation with Figure 1 of the paper. Energies are in eV. The paper values are that figure's B3LYP/6-31G(d) results, not experimental measurements.
+Running the batch cell writes the properties to the output CSV. The table below compares this B3LYP/6-31G(d) calculation (`grids.level = 3`) with Figure 1 of the paper. Energies are in eV. The paper values are that figure's B3LYP/6-31G(d) results, not experimental measurements. This work's energies are `output/test_dft_results.csv` rounded to three decimal places.
 
 | Molecule | Source | HOMO | LUMO | S1 | T1 | f |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | ICzCN | Paper, Fig. 1 | −5.02 | −2.16 | 2.50 | 2.49 | 0.0043 |
-| ICzCN | This work | −5.07 | −2.15 | 2.58 | 2.56 | 0.0138 |
+| ICzCN | This work | −5.074 | −2.153 | 2.577 | 2.562 | 0.0138 |
 | ICzCYP | Paper, Fig. 1 | −4.97 | −2.16 | 2.48 | 2.46 | 0.0076 |
-| ICzCYP | This work | −5.01 | −2.17 | 2.51 | 2.46 | 0.0074 |
+| ICzCYP | This work | −5.006 | −2.167 | 2.509 | 2.462 | 0.0074 |
 
-ICzCYP is close. Its LUMO differs by about 0.01 eV. The larger gaps in the ICzCN oscillator strength come mainly from the acceptor torsion, with a smaller contribution from the resolution-of-the-identity (RI) approximation and the coarse integration grid (`grids.level = 1`).
+ICzCYP matches the paper on T1 and *f*. The LUMO differs by about 0.01 eV for both molecules. HOMO is 0.05 eV lower for ICzCN and 0.04 eV lower for ICzCYP, and S1 of ICzCN is 0.08 eV higher. The oscillator strength differs a lot only for ICzCN. The integration grid is the PySCF default (`level = 3`), so the remaining gap comes from the RI approximation for J and K and from the acceptor torsion.
 
 ### 2. `mace_tddft_sandbox.ipynb` (MACE optimization, then a DFT single point)
 
@@ -104,16 +104,17 @@ MACE-OFF23 optimizes the geometry quickly, and GPU4PySCF then evaluates the elec
 
 - **Purpose**: a first pass over a larger set. Most of the time saved is in the geometry optimization.
 - **How to run**: same pattern as `dft_sandbox.ipynb`.
+- **Output**: under `output_mace/`, `_opt.xyz`, `.log`, `.fchk`, HOMO/LUMO cubes, and the summary CSV. No Molden file.
 - **Note**: molecules that contain an unsupported element, such as boron, are marked `fail` and can be sent through `dft_sandbox.ipynb` instead.
 
-Both rows below use the same electronic-structure settings: B3LYP/6-31G(d), `grids.level = 1`, and the RI approximation for both Coulomb (J) and exchange (K). The geometry optimizer differs: geomeTRIC with DFT forces, or MACE-OFF23. Energies are in eV. The wall time covers optimization through TD-DFT. The table is the `level = 1` run. The default in `dft_sandbox.ipynb` is now `level = 3`, the PySCF default.
+The two notebooks share the electronic-structure settings: B3LYP/6-31G(d), `grids.level = 3`, and the RI approximation for both Coulomb (J) and exchange (K). Only the geometry optimizer differs. MACE-OFF23 supplies the MACE geometry. Energies are in eV, rounded to three decimal places. The DFT wall time covers optimization through TD-DFT. The latest DFT rerun reused the optimized xyz, so the CSV elapsed times (2 h 52 min for ICzCN, 2 h 59 min for ICzCYP) are the single point and TD-DFT only. The MACE wall times are the full `grids.level = 3` run, from optimization through TD-DFT.
 
 | Molecule | Optimization | HOMO | LUMO | S1 | T1 | f | Wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| ICzCN | DFT | −5.07 | −2.15 | 2.58 | 2.56 | 0.0138 | 7 h 23 min |
-| ICzCN | MACE | −5.08 | −1.92 | 2.81 | 2.80 | 0.0037 | 2 h 55 min |
-| ICzCYP | DFT | −5.01 | −2.17 | 2.51 | 2.46 | 0.0074 | 7 h 32 min |
-| ICzCYP | MACE | −4.96 | −2.04 | 2.59 | 2.59 | 0.0017 | 3 h 4 min |
+| ICzCN | DFT | −5.074 | −2.153 | 2.577 | 2.562 | 0.0138 | 7 h 23 min |
+| ICzCN | MACE | −5.079 | −1.924 | 2.811 | 2.803 | 0.0037 | 2 h 57 min |
+| ICzCYP | DFT | −5.006 | −2.167 | 2.509 | 2.462 | 0.0074 | 7 h 32 min |
+| ICzCYP | MACE | −4.962 | −2.038 | 2.594 | 2.589 | 0.0017 | 3 h 2 min |
 
 HOMO stays within 0.05 eV. LUMO, S1, and *f* do not. MACE-OFF23 small, medium, and large differ in model size only. All three are trained at ωB97M-D3(BJ)/def2-TZVPPD, which includes dispersion and uses a much larger basis than B3LYP/6-31G(d) without dispersion. Switching to the large model does not remove this difference.
 
@@ -157,13 +158,13 @@ The same procedure as the ionization notebook, using the neutral molecule and th
 - **`data/`**
   Input only. Place the SMILES CSV files here.
 - **`output/`**
-  Results from the DFT notebooks and the single-molecule notebooks: `.log`, `.xyz`, `.cube`, `.molden`, `result.txt`, and the summary CSV.
+  Results from the DFT notebooks and the single-molecule notebooks: `.log`, `.xyz`, `.cube`, `.molden`, `.fchk`, `result.txt`, and the summary CSV.
 - **`output_mace/`**
   Results from `mace_tddft_sandbox.ipynb`, including the summary CSV.
 
 ## Speed and memory (cuTENSOR, grid, and the memory pool)
 
-`dft_sandbox.ipynb` uses `grids.level = 3`, the PySCF default, which is close to Gaussian `Integral=Fine`. The comparison table above was computed at the coarser `level = 1`. `mace_tddft_sandbox.ipynb` stays at `level = 1` for screening. `level = 3` uses more VRAM and time, so stop other CUDA jobs on an 8GB GPU.
+Both `dft_sandbox.ipynb` and `mace_tddft_sandbox.ipynb` use `grids.level = 3`, the PySCF default, which is close to Gaussian `Integral=Fine`. The paper comparison and the DFT–MACE comparison both use this grid. `level = 3` uses more VRAM and time, so stop other CUDA jobs on an 8GB GPU.
 
 `dft_sandbox.ipynb` returns the CuPy memory pool to the OS after the geometry optimization, after the singlet TD-DFT, and after each molecule. The ionization and electron-affinity notebooks do the same when they change charge state. cuTENSOR is preloaded with `ctypes`, and CuPy / GPU4PySCF then use it for tensor contractions.
 
