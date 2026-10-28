@@ -13,21 +13,27 @@ This repository takes a SMILES string, builds a 3D structure, and runs geometry 
 Create the environment with `conda`, `mamba`, or `micromamba`.
 
 ```bash
-# 1. Enter the cloned repository
-cd /path/to/<your_repository_name>
+# 1. Clone the repository and enter it
+git clone https://github.com/K-Yuta1014/How-to-use-gpu4pyscf.git
+cd How-to-use-gpu4pyscf
 
 # 2. Create the conda environment
 conda env create -f environment.yml
 
 # 3. Activate it
 conda activate gpu4pyscf
+
+# 4. Start Jupyter from the repository root
+jupyter lab
 ```
 
 This installs PySCF, GPU4PySCF, MACE, cuTENSOR, and Jupyter. An NVIDIA driver that supports CUDA 12 is required separately. `environment.yml` points `pip` at the PyTorch CUDA 12.1 index so that the MACE stack (`torch==2.5.1+cu121`) can be installed.
 
+Paths in the notebooks, such as `data/` and `output/`, are relative to the repository root. Start Jupyter from that directory.
+
 ## Input format
 
-Put a CSV file in `data/` before starting a batch. It needs at least two columns.
+Put a CSV file in `data/` before starting a batch. It needs at least two columns. Either column may come first.
 
 - **`material` (or `index`)**: an ID or name, such as `BTD1`, `1`, or `OLED_Material_A`. The string is used as the output folder name and the log file name.
 - **`SMILES`**: the structure, for example `C=1C=CC=CC1`.
@@ -158,7 +164,7 @@ The same procedure as the ionization notebook, using the neutral molecule and th
 - **`data/`**
   Input only. Place the SMILES CSV files here.
 - **`output/`**
-  Results from the DFT notebooks and the single-molecule notebooks: `.log`, `.xyz`, `.cube`, `.molden`, `.fchk`, `result.txt`, and the summary CSV.
+  Results from the DFT notebooks and the single-molecule notebooks: `.log`, `_geomopt.log`, `.xyz`, `.cube`, `.molden`, `.fchk`, `result.txt`, and the summary CSV. `.log` is the single point on the optimized geometry. `_geomopt.log` is the geometry optimization.
 - **`output_mace/`**
   Results from `mace_tddft_sandbox.ipynb`, including the summary CSV.
 
