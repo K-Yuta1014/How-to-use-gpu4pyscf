@@ -7,3 +7,9 @@ __pycache__/
 # 再計算で作れる大きなバイナリ。cube と log はリポジトリに残す
 **/*.chk
 **/*.molden
+
+# ブログ記事
+qiita.md
+
+# 出力
+output/NPD
