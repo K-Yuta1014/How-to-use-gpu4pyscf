@@ -110,7 +110,7 @@ MACE-OFF23 optimizes the geometry quickly, and GPU4PySCF then evaluates the elec
 
 - **Purpose**: a first pass over a larger set. Most of the time saved is in the geometry optimization.
 - **How to run**: same pattern as `dft_sandbox.ipynb`.
-- **Output**: under `output_mace/`, `_opt.xyz`, `.log`, `.fchk`, HOMO/LUMO cubes, and the summary CSV. No Molden file.
+- **Output**: under `output_mace/`, `_opt.xyz`, `.log`, `.fchk`, `.molden`, HOMO/LUMO cubes, and the summary CSV.
 - **Note**: molecules that contain an unsupported element, such as boron, are marked `fail` and can be sent through `dft_sandbox.ipynb` instead.
 
 The two notebooks share the electronic-structure settings: B3LYP/6-31G(d), `grids.level = 3`, and the RI approximation for both Coulomb (J) and exchange (K). Only the geometry optimizer differs. MACE-OFF23 supplies the MACE geometry. Energies are in eV, rounded to three decimal places. The DFT wall time covers optimization through TD-DFT. The latest DFT rerun reused the optimized xyz, so the CSV elapsed times (2 h 52 min for ICzCN, 2 h 59 min for ICzCYP) are the single point and TD-DFT only. The MACE wall times are the full `grids.level = 3` run, from optimization through TD-DFT.
@@ -141,7 +141,7 @@ One molecule is optimized and evaluated with a basis that includes diffuse funct
 
 - **Purpose**: an electronic structure for RESP charges in Multiwfn, and an electrostatic-potential map. TD-DFT is not run.
 - **How to run**: set `xyz_path` to a roughly optimized xyz, such as a MACE geometry. The notebook reoptimizes it at B3LYP/6-31+G(d,p), then writes the RESP wavefunction from an HF/6-31G(d) single point.
-- **Output**: `{name}_resp_geomopt.log`, `{name}_resp_opt.xyz`, `{name}_resp.log`, `{name}_resp.chk`, and `{name}_resp.fchk` for Multiwfn.
+- **Output**: `{name}_resp_geomopt.log`, `{name}_resp_opt.xyz`, `{name}_resp.log`, `{name}_resp.chk`, `{name}_resp.fchk`, and `{name}_resp.molden`. Use the Molden file for RESP in Multiwfn.
 
 ### 4. `dft_ip_reorg.ipynb` (hole-transport properties, one molecule)
 

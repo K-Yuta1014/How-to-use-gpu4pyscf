@@ -115,7 +115,7 @@ HOMOはカルバゾールに局在化しており、LUMOは中央のシアノピ
 
 - **目的**: より巨大なデータセットの1次スクリーニング。構造最適化にかかる時間を大幅に短縮します。
 - **使い方**: `dft_sandbox.ipynb` と同様。
-- **出力**: `output_mace/` に `_opt.xyz`、`.log`、`.fchk`、HOMO/LUMO の Cube、物性一覧の CSV。Molden は出さない。
+- **出力**: `output_mace/` に `_opt.xyz`、`.log`、`.fchk`、`.molden`、HOMO/LUMO の Cube、物性一覧の CSV。
 - **注意**: ホウ素(B)などの一部の非対応元素が含まれる分子はエラー（`fail`）となるため、通常の `dft_sandbox.ipynb` で補完する必要があります。
 
 同じ2分子を比べています。違うのは構造最適化だけで、電子状態はどちらも B3LYP/6-31G(d)、`grids.level = 3`、J・K とも RI 近似です。MACE 側の構造は MACE-OFF23 です。エネルギーは eV で、小数第3位に丸めています。DFT の計算時間は、構造最適化から TD-DFT までの全工程です。直近の DFT 再計算は最適化済みの xyz を再利用したので、CSV の経過時間（ICzCN 2時間52分、ICzCYP 2時間59分）は単点計算と TD-DFT だけです。MACE の計算時間は、`grids.level = 3` で構造最適化から TD-DFT まで通した時間です。
@@ -163,8 +163,8 @@ MACE 構造を同じ B3LYP/6-31G(d) で単点評価すると、DFT 最適化構�
 ### 3. `dft_resp_single.ipynb` (RESP電荷・精密解析用 / 単分子)
 特定の1分子に対して、分散関数(+付き)を含む高精度な基底関数を用いて構造最適化と単点計算を行うノートブックです。
 - **目的**: Multiwfn等を用いたRESP電荷の計算や、精緻なESPマップの作成。TD-DFTは行わず、計算リソースを電荷解析のための電子状態計算に集中させます。
-- **使い方**: MACE などで粗く最適化した xyz のパスを `xyz_path` に書いて実行する。その座標から B3LYP/6-31+G(d,p) で構造を取り直し、HF/6-31G(d) の単点計算で RESP 用の fchk を書く。
-- **出力**: `{名前}_resp_geomopt.log`、`{名前}_resp_opt.xyz`、`{名前}_resp.log`、`{名前}_resp.chk`、Multiwfn に渡す `{名前}_resp.fchk`。
+- **使い方**: MACE などで粗く最適化した xyz のパスを `xyz_path` に書いて実行する。その座標から B3LYP/6-31+G(d,p) で構造を取り直し、HF/6-31G(d) の単点計算で RESP 用の波動関数を書く。
+- **出力**: `{名前}_resp_geomopt.log`、`{名前}_resp_opt.xyz`、`{名前}_resp.log`、`{名前}_resp.chk`、`{名前}_resp.fchk`、Multiwfn の RESP に渡す `{名前}_resp.molden`。
 
 ### 4. `dft_ip_reorg.ipynb` (ホール輸送物性の解析 / 単分子)
 特定の1分子について、中性状態とカチオン(正電荷)状態それぞれの構造最適化と単点計算を組み合わせ、ホール輸送に関するパラメータを算出します。
