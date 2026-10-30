@@ -104,7 +104,7 @@ Running the batch cell writes the properties to the output CSV. The table below 
 
 ICzCYP matches the paper on T1 and *f*. The LUMO differs by about 0.01 eV for both molecules. HOMO is 0.05 eV lower for ICzCN and 0.04 eV lower for ICzCYP, and S1 of ICzCN is 0.08 eV higher. The oscillator strength differs a lot only for ICzCN. The integration grid is the PySCF default (`level = 3`), so the remaining gap comes from the RI approximation for J and K and from the acceptor torsion.
 
-### 2. `mace_tddft_sandbox.ipynb` (MACE optimization, then a DFT single point)
+### 2. `mace_sandbox.ipynb` (MACE optimization, then a DFT single point)
 
 MACE-OFF23 optimizes the geometry quickly, and GPU4PySCF then evaluates the electronic structure on that geometry without a further DFT optimization. The force field reproduces ωB97M-D3(BJ)/def2-TZVPPD, so the geometry is not expected to match a B3LYP/6-31G(d) optimization.
 
@@ -140,8 +140,8 @@ The MACE wall time is about one third of the DFT wall time, which is useful for 
 One molecule is optimized and evaluated with a basis that includes diffuse functions.
 
 - **Purpose**: an electronic structure for RESP charges in Multiwfn, and an electrostatic-potential map. TD-DFT is not run.
-- **How to run**: paste the SMILES into the `SMILES` variable.
-- **Output**: `_opt.xyz`, a checkpoint, a Molden orbital file, and cube files for the ESP.
+- **How to run**: set `xyz_path` to a roughly optimized xyz, such as a MACE geometry. The notebook reoptimizes it at B3LYP/6-31+G(d,p), then writes the RESP wavefunction from an HF/6-31G(d) single point.
+- **Output**: `{name}_resp_geomopt.log`, `{name}_resp_opt.xyz`, `{name}_resp.log`, `{name}_resp.chk`, and `{name}_resp.fchk` for Multiwfn.
 
 ### 4. `dft_ip_reorg.ipynb` (hole-transport properties, one molecule)
 
@@ -166,11 +166,11 @@ The same procedure as the ionization notebook, using the neutral molecule and th
 - **`output/`**
   Results from the DFT notebooks and the single-molecule notebooks: `.log`, `_geomopt.log`, `.xyz`, `.cube`, `.molden`, `.fchk`, `result.txt`, and the summary CSV. `.log` is the single point on the optimized geometry. `_geomopt.log` is the geometry optimization.
 - **`output_mace/`**
-  Results from `mace_tddft_sandbox.ipynb`, including the summary CSV.
+  Results from `mace_sandbox.ipynb`, including the summary CSV.
 
 ## Speed and memory (cuTENSOR, grid, and the memory pool)
 
-Both `dft_sandbox.ipynb` and `mace_tddft_sandbox.ipynb` use `grids.level = 3`, the PySCF default, which is close to Gaussian `Integral=Fine`. The paper comparison and the DFT–MACE comparison both use this grid. `level = 3` uses more VRAM and time, so stop other CUDA jobs on an 8GB GPU.
+Both `dft_sandbox.ipynb` and `mace_sandbox.ipynb` use `grids.level = 3`, the PySCF default, which is close to Gaussian `Integral=Fine`. The paper comparison and the DFT–MACE comparison both use this grid. `level = 3` uses more VRAM and time, so stop other CUDA jobs on an 8GB GPU.
 
 `dft_sandbox.ipynb` returns the CuPy memory pool to the OS after the geometry optimization, after the singlet TD-DFT, and after each molecule. The ionization and electron-affinity notebooks do the same when they change charge state. cuTENSOR is preloaded with `ctypes`, and CuPy / GPU4PySCF then use it for tensor contractions.
 

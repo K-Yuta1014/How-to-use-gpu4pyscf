@@ -110,7 +110,7 @@ ICzCYP は T1 と f が論文値に揃っています。LUMO の差はどちら�
 HOMOはカルバゾールに局在化しており、LUMOは中央のシアノピリジン＋フェニルに局在化しています（若干カルバゾールのN原子にも）。     
 この結果も論文と一致しています。
 
-### 2. `mace_tddft_sandbox.ipynb` (MACEを用いた高速最適化 / バッチ処理)
+### 2. `mace_sandbox.ipynb` (MACEを用いた高速最適化 / バッチ処理)
 機械学習ポテンシャルである **MACE (MACE-OFF23)** で構造最適化を短時間に行い、その構造のまま GPU4PySCF で電子状態を計算するワークフローです。
 
 - **目的**: より巨大なデータセットの1次スクリーニング。構造最適化にかかる時間を大幅に短縮します。
@@ -163,8 +163,8 @@ MACE 構造を同じ B3LYP/6-31G(d) で単点評価すると、DFT 最適化構�
 ### 3. `dft_resp_single.ipynb` (RESP電荷・精密解析用 / 単分子)
 特定の1分子に対して、分散関数(+付き)を含む高精度な基底関数を用いて構造最適化と単点計算を行うノートブックです。
 - **目的**: Multiwfn等を用いたRESP電荷の計算や、精緻なESPマップの作成。TD-DFTは行わず、計算リソースを電荷解析のための電子状態計算に集中させます。
-- **使い方**: 最適化済みの xyz のパスを `xyz_path` に書いて実行する。構造最適化はしない。
-- **出力**: `{名前}_resp.log`、`{名前}_resp.chk`、Multiwfn に渡す `{名前}_resp.fchk`。
+- **使い方**: MACE などで粗く最適化した xyz のパスを `xyz_path` に書いて実行する。その座標から B3LYP/6-31+G(d,p) で構造を取り直し、HF/6-31G(d) の単点計算で RESP 用の fchk を書く。
+- **出力**: `{名前}_resp_geomopt.log`、`{名前}_resp_opt.xyz`、`{名前}_resp.log`、`{名前}_resp.chk`、Multiwfn に渡す `{名前}_resp.fchk`。
 
 ### 4. `dft_ip_reorg.ipynb` (ホール輸送物性の解析 / 単分子)
 特定の1分子について、中性状態とカチオン(正電荷)状態それぞれの構造最適化と単点計算を組み合わせ、ホール輸送に関するパラメータを算出します。
@@ -188,10 +188,10 @@ MACE 構造を同じ B3LYP/6-31G(d) で単点評価すると、DFT 最適化構�
   分子ごとの詳細データ（`.log`, `_geomopt.log`, `.xyz`, `.cube`, `.molden`, `.fchk`, `result.txt`）や最終的な物性値が一覧になった結果CSVがここに保存されます。`.log` は最適化構造での単点計算、`_geomopt.log` は構造最適化のログです。
 - **`output_mace/`**
   **結果の保存先ディレクトリです（MACE版）。**
-  `mace_tddft_sandbox.ipynb` を実行した際に生成される詳細データと、結果一覧のCSVファイルが保存されます。
+  `mace_sandbox.ipynb` を実行した際に生成される詳細データと、結果一覧のCSVファイルが保存されます。
 
 ## 計算の高速化について (cuTENSOR / グリッド密度 / メモリ管理)
-`dft_sandbox.ipynb` と `mace_tddft_sandbox.ipynb` の積分グリッドはどちらも `grids.level = 3` です。PySCF の初期値で、Gaussian の `Integral=Fine` に近い密度です。論文との比較表と、DFT と MACE の比較表は、どちらもこの設定です。`level = 3` は VRAM と計算時間が増えるので、8GB 級の GPU では他の CUDA ジョブを止めて実行してください。
+`dft_sandbox.ipynb` と `mace_sandbox.ipynb` の積分グリッドはどちらも `grids.level = 3` です。PySCF の初期値で、Gaussian の `Integral=Fine` に近い密度です。論文との比較表と、DFT と MACE の比較表は、どちらもこの設定です。`level = 3` は VRAM と計算時間が増えるので、8GB 級の GPU では他の CUDA ジョブを止めて実行してください。
 
 `dft_sandbox.ipynb` では、構造最適化のあと、一重項 TD-DFT のあと、そして分子が1つ終わるごとに、CuPy のメモリプールを OS へ返します。前の計算の配列が VRAM に残ったまま次へ進まないようにするためです。IP と EA のノートブックも、電荷状態を切り替えるたびに同じ解放をしています。
 
